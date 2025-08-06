@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Google Drive PDF Exporter",
+  "version": "1.0",
+  "description": "Adds a 'Download as PDF' button to the Google Drive file preview.",
+  "permissions": [
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://drive.google.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://drive.google.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["jspdf.umd.min.js"],
+      "matches": ["https://drive.google.com/*"]
+    }
+  ],
+  "icons": {
+    "48": "img/icon48.png",
+    "128": "img/icon128.png"
+  }
+}
