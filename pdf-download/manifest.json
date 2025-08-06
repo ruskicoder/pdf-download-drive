@@ -1,10 +1,15 @@
 {
   "manifest_version": 3,
-  "name": "Google Drive PDF Exporter",
-  "version": "1.0",
-  "description": "Adds a 'Download as PDF' button to the Google Drive file preview.",
+  "name": "Google Drive PDF Downloader",
+  "version": "1.0.0",
+  "description": "Automatically download all PDF files from Google Drive folders",
   "permissions": [
-    "scripting"
+    "activeTab",
+    "scripting",
+    "storage",
+    "tabs",
+    "downloads",
+    "debugger"
   ],
   "host_permissions": [
     "https://drive.google.com/*"
@@ -13,17 +18,31 @@
     {
       "matches": ["https://drive.google.com/*"],
       "js": ["content.js"],
-      "css": ["styles.css"]
+      "run_at": "document_end"
     }
   ],
-  "web_accessible_resources": [
-    {
-      "resources": ["jspdf.umd.min.js"],
-      "matches": ["https://drive.google.com/*"]
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Google Drive PDF Downloader",
+    "default_icon": {
+      "48": "img/icon48.png",
+      "128": "img/icon128.png"
     }
-  ],
+  },
   "icons": {
     "48": "img/icon48.png",
     "128": "img/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["popup.html", "popup.css", "popup.js", "jspdf.umd.min.js"],
+      "matches": ["https://drive.google.com/*"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
   }
 }
