@@ -39,35 +39,62 @@ class GoogleDrivePDFDownloader {
     }
     
     injectPopupInterface() {
-        // Create a floating button that opens the popup
+        // Create a Google Drive styled download button
         const floatingBtn = document.createElement('div');
         floatingBtn.id = 'pdf-downloader-float';
-        floatingBtn.innerHTML = '📄';
+        
+        // Create the button content with icon and text
+        floatingBtn.innerHTML = `
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 8px;">
+                <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                <path d="M12,11L8,15H10.5V19H13.5V15H16L12,11Z"/>
+            </svg>
+            <span>Download</span>
+        `;
+        
         floatingBtn.style.cssText = `
             position: fixed;
             top: 20px;
-            right: 20px;
-            width: 50px;
-            height: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: auto;
+            height: 36px;
+            min-width: 120px;
             background: #1a73e8;
             color: white;
-            border-radius: 50%;
+            border-radius: 18px;
             display: flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             z-index: 10000;
-            font-size: 20px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            transition: transform 0.2s;
+            font-family: 'Google Sans', Roboto, RobotoDraft, Helvetica, Arial, sans-serif;
+            font-size: 14px;
+            font-weight: 500;
+            padding: 0 16px;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+            transition: all 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
+            border: 1px solid transparent;
+            user-select: none;
         `;
         
         floatingBtn.addEventListener('mouseenter', () => {
-            floatingBtn.style.transform = 'scale(1.1)';
+            floatingBtn.style.backgroundColor = '#1557b0';
+            floatingBtn.style.boxShadow = '0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15)';
         });
         
         floatingBtn.addEventListener('mouseleave', () => {
-            floatingBtn.style.transform = 'scale(1)';
+            floatingBtn.style.backgroundColor = '#1a73e8';
+            floatingBtn.style.boxShadow = '0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)';
+        });
+        
+        floatingBtn.addEventListener('mousedown', () => {
+            floatingBtn.style.backgroundColor = '#1347a0';
+            floatingBtn.style.boxShadow = '0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15)';
+        });
+        
+        floatingBtn.addEventListener('mouseup', () => {
+            floatingBtn.style.backgroundColor = '#1557b0';
         });
         
         floatingBtn.addEventListener('click', () => {
