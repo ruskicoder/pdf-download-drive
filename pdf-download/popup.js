@@ -42,9 +42,13 @@ class PopupController {
                 this.downloadSingleBtn.disabled = false;
                 this.downloadAllBtn.disabled = true;
             } else if (response && response.type === 'folder') {
-                this.setStatus('Folder view detected - ready for bulk download');
+                this.setStatus('Bulk download temporarily disabled. Open a file preview for single download.');
                 this.downloadSingleBtn.disabled = true;
-                this.downloadAllBtn.disabled = false;
+                this.downloadAllBtn.disabled = true;
+            } else if (response && response.type === 'folder_disabled') {
+                this.setStatus('Bulk download temporarily disabled. Open a file preview for single download.');
+                this.downloadSingleBtn.disabled = true;
+                this.downloadAllBtn.disabled = true;
             } else if (response && response.type === 'unsupported') {
                 this.setStatus('Direct file view not supported. Open file from folder.', 'error');
                 this.downloadSingleBtn.disabled = true;
