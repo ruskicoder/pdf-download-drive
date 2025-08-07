@@ -17,7 +17,7 @@
   "content_scripts": [
     {
       "matches": ["https://drive.google.com/*"],
-      "js": ["content.js"],
+      "js": ["jspdf.umd.min.js", "content.js"],
       "run_at": "document_end"
     }
   ],
@@ -38,7 +38,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["popup.html", "popup.css", "popup.js"],
+      "resources": ["popup.html", "popup.css", "popup.js", "jspdf.umd.min.js"],
       "matches": ["https://drive.google.com/*"]
     }
   ],

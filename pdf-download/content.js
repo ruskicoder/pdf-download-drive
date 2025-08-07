@@ -179,9 +179,9 @@ class GoogleDrivePDFDownloader {
             const fileName = await this.extractFileNameFromPreview();
             this.sendMessage({ type: 'log', text: `🎯 Detected filename: ${fileName}`, logType: 'info' });
             
-            // Show manual script injection popup with the current filename
-            this.sendMessage({ type: 'status', text: 'Manual script required for download.', statusType: 'working' });
-            await this.showManualScriptPopup(fileName);
+            // Automatically execute PDF generation
+            this.sendMessage({ type: 'status', text: 'Generating PDF automatically...', statusType: 'working' });
+            await this.generatePDFDirectly(fileName);
             
             this.removeWarningOverlay();
             this.sendMessage({ type: 'status', text: 'Download completed', statusType: 'success' });
@@ -338,6 +338,233 @@ class GoogleDrivePDFDownloader {
     // Real-time filename detection that can be called dynamically
     async getCurrentFileName() {
         return await this.extractFileNameFromPreview();
+    }
+    
+    cleanupFileName(rawText) {
+        return new Promise((resolve, reject) => {
+            try {
+                console.log('🚀 Starting automatic PDF generation...');
+                
+                // Dynamic filename extraction function for the injected script
+                const extractCurrentFileName = `
+                    function extractCurrentFileName() {
+                        console.log('Extracting current filename...');
+                        
+                        // Define the OCR scan area: top-left 25% width x 10% height viewport
+                        const scanArea = {
+                            left: 0,
+                            top: 0,
+                            width: window.innerWidth * 0.25,
+                            height: window.innerHeight * 0.10
+                        };
+                        
+                        // Get all elements that intersect with the scan area
+                        const elementsInScanArea = [];
+                        const allElements = document.querySelectorAll('*');
+                        
+                        for (const element of allElements) {
+                            const rect = element.getBoundingClientRect();
+                            
+                            if (rect.left < scanArea.width && 
+                                rect.top < scanArea.height && 
+                                rect.right > scanArea.left && 
+                                rect.bottom > scanArea.top &&
+                                rect.width > 0 && 
+                                rect.height > 0) {
+                                
+                                elementsInScanArea.push({
+                                    element,
+                                    rect,
+                                    area: rect.width * rect.height
+                                });
+                            }
+                        }
+                        
+                        // Search for PDF filenames in scan area
+                        for (const {element} of elementsInScanArea) {
+                            const textSources = [
+                                element.textContent?.trim(),
+                                element.getAttribute('title'),
+                                element.getAttribute('aria-label'),
+                                element.getAttribute('data-tooltip'),
+                                element.getAttribute('data-original-text')
+                            ].filter(text => text && text.length > 0);
+                            
+                            for (const text of textSources) {
+                                if (text.toLowerCase().includes('.pdf')) {
+                                    return cleanupFileName(text);
+                                }
+                            }
+                        }
+                        
+                        // Fallback to document title
+                        const docTitle = document.title;
+                        if (docTitle && docTitle.includes('.pdf')) {
+                            return cleanupFileName(docTitle.replace(' - Google Drive', ''));
+                        }
+                        
+                        return 'document_' + Date.now() + '.pdf';
+                    }
+                `;
+                
+                // Create the complete PDF generation script
+                const pdfScript = `
+                    (function() {
+                        console.log('🎯 PDF Generation Script Started');
+                        
+                        // Clean filename function
+                        function cleanupFileName(rawText) {
+                            const pdfIndex = rawText.toLowerCase().indexOf('.pdf');
+                            if (pdfIndex === -1) {
+                                return 'download.pdf';
+                            }
+                            let cleanName = rawText.substring(0, pdfIndex + 4);
+                            cleanName = cleanName.trim();
+                            cleanName = cleanName.replace(/[<>:"/\\\\|?*]/g, '_');
+                            if (!cleanName.toLowerCase().endsWith('.pdf')) {
+                                cleanName += '.pdf';
+                            }
+                            return cleanName;
+                        }
+                        
+                        ${extractCurrentFileName}
+                        
+                        // Try to use local jsPDF first, then fallback to CDN
+                        if (window.jspdf && window.jspdf.jsPDF) {
+                            console.log('✅ Using local jsPDF library');
+                            generatePDF(window.jspdf.jsPDF);
+                        } else {
+                            console.log('📥 Loading jsPDF from CDN...');
+                            let jspdfScript = document.createElement("script");
+                            jspdfScript.onload = function() {
+                                console.log('✅ jsPDF loaded from CDN');
+                                generatePDF(window.jspdf.jsPDF);
+                            };
+                            jspdfScript.onerror = function() {
+                                console.error('❌ Failed to load jsPDF');
+                                alert('Failed to load PDF library. Please try again.');
+                            };
+                            jspdfScript.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+                            document.body.appendChild(jspdfScript);
+                        }
+                        
+                        function generatePDF(jsPDF) {
+                            try {
+                                console.log('📄 Creating PDF document...');
+                                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                                
+                                // Find all blob images (PDF pages)
+                                const elements = Array.from(document.getElementsByTagName("img"));
+                                const blobImages = elements.filter(img => /^blob:/.test(img.src));
+                                
+                                if (blobImages.length === 0) {
+                                    console.error('❌ No PDF pages found');
+                                    alert('No PDF content found. Make sure the file is fully loaded.');
+                                    return;
+                                }
+                                
+                                console.log(\`📖 Found \${blobImages.length} pages\`);
+                                
+                                // Get the current filename
+                                const currentFileName = extractCurrentFileName();
+                                console.log('📝 Using filename:', currentFileName);
+                                
+                                let pagesProcessed = 0;
+                                
+                                blobImages.forEach((img, index) => {
+                                    try {
+                                        if (index > 0) pdf.addPage();
+                                        
+                                        console.log(\`🖼️ Processing page \${index + 1}/\${blobImages.length}\`);
+                                        
+                                        const canvas = document.createElement('canvas');
+                                        const ctx = canvas.getContext("2d");
+                                        canvas.width = img.naturalWidth;
+                                        canvas.height = img.naturalHeight;
+                                        ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
+                                        
+                                        const imgData = canvas.toDataURL("image/jpeg", 1.0);
+                                        const pageWidth = pdf.internal.pageSize.getWidth();
+                                        const pageHeight = pdf.internal.pageSize.getHeight();
+                                        const imgRatio = canvas.width / canvas.height;
+                                        const pageRatio = pageWidth / pageHeight;
+                                        
+                                        let width, height, x, y;
+                                        if (imgRatio > pageRatio) {
+                                            width = pageWidth;
+                                            height = pageWidth / imgRatio;
+                                        } else {
+                                            height = pageHeight;
+                                            width = pageHeight * imgRatio;
+                                        }
+                                        x = (pageWidth - width) / 2;
+                                        y = (pageHeight - height) / 2;
+                                        
+                                        pdf.addImage(imgData, 'JPEG', x, y, width, height);
+                                        pagesProcessed++;
+                                        
+                                    } catch (e) {
+                                        console.error(\`❌ Error processing page \${index + 1}:\`, e);
+                                    }
+                                });
+                                
+                                if (pagesProcessed > 0) {
+                                    console.log(\`💾 Saving PDF: \${currentFileName}\`);
+                                    pdf.save(currentFileName);
+                                    console.log('✅ PDF download initiated');
+                                } else {
+                                    console.error('❌ No pages were processed successfully');
+                                    alert('Failed to process PDF pages. Please try again.');
+                                }
+                                
+                            } catch (error) {
+                                console.error('❌ PDF generation error:', error);
+                                alert('PDF generation failed: ' + error.message);
+                            }
+                        }
+                    })();
+                `;
+                
+                // Execute the script
+                console.log('📤 Injecting PDF generation script...');
+                
+                // Create script element and inject
+                const scriptElement = document.createElement('script');
+                scriptElement.textContent = pdfScript;
+                
+                // Add completion handler
+                scriptElement.onload = () => {
+                    console.log('✅ PDF script executed successfully');
+                    setTimeout(() => {
+                        document.head.removeChild(scriptElement);
+                        resolve();
+                    }, 1000);
+                };
+                
+                scriptElement.onerror = (error) => {
+                    console.error('❌ PDF script execution failed:', error);
+                    reject(new Error('PDF script execution failed'));
+                };
+                
+                // Inject the script
+                document.head.appendChild(scriptElement);
+                
+                // Auto-resolve after 5 seconds as a safety measure
+                setTimeout(() => {
+                    console.log('⏰ Auto-resolving PDF generation...');
+                    try {
+                        document.head.removeChild(scriptElement);
+                    } catch (e) {
+                        // Script may have already been removed
+                    }
+                    resolve();
+                }, 5000);
+                
+            } catch (error) {
+                console.error('❌ PDF generation setup failed:', error);
+                reject(error);
+            }
+        });
     }
     
     cleanupFileName(rawText) {
@@ -517,6 +744,8 @@ class GoogleDrivePDFDownloader {
         return containers.some(el => el.extScrolledNow);
     }
     
+    // DEPRECATED: Manual script popup - now using automatic execution
+    // This method is kept for fallback purposes but is no longer used in normal flow
     async showManualScriptPopup(fileName) {
         return new Promise((resolve) => {
             const cleanFileName = this.cleanupFileName(fileName);
@@ -865,6 +1094,114 @@ class GoogleDrivePDFDownloader {
             chrome.runtime.sendMessage(message);
         } catch (error) {
             console.error('Failed to send message:', error);
+        }
+    }
+    
+    async generatePDFDirectly(fileName) {
+        try {
+            this.sendMessage({ type: 'log', text: 'Initializing PDF generation...', logType: 'info' });
+            
+            // Debug: Check what's available in the global scope
+            console.log('Available global objects:', Object.keys(window).filter(key => key.toLowerCase().includes('pdf')));
+            console.log('window.jspdf:', typeof window.jspdf);
+            console.log('window.jsPDF:', typeof window.jsPDF);
+            
+            // Try different ways to access jsPDF
+            let jsPDF;
+            
+            if (typeof window.jspdf !== 'undefined' && window.jspdf.jsPDF) {
+                jsPDF = window.jspdf.jsPDF;
+                console.log('Using window.jspdf.jsPDF');
+            } else if (typeof window.jsPDF !== 'undefined') {
+                jsPDF = window.jsPDF;
+                console.log('Using window.jsPDF');
+            } else if (typeof jspdf !== 'undefined' && jspdf.jsPDF) {
+                jsPDF = jspdf.jsPDF;
+                console.log('Using global jspdf.jsPDF');
+            } else {
+                throw new Error('jsPDF library not found. Available globals: ' + Object.keys(window).filter(key => key.toLowerCase().includes('pdf')).join(', '));
+            }
+            
+            const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            
+            // Find all blob images (PDF pages) in the preview
+            const elements = Array.from(document.getElementsByTagName("img"));
+            const blobImages = elements.filter(img => /^blob:/.test(img.src));
+            
+            if (blobImages.length === 0) {
+                throw new Error('No PDF pages found. Make sure the file is fully loaded.');
+            }
+            
+            this.sendMessage({ type: 'log', text: `Found ${blobImages.length} pages to convert`, logType: 'info' });
+            
+            // Process each image/page
+            for (let index = 0; index < blobImages.length; index++) {
+                const img = blobImages[index];
+                
+                this.sendMessage({ type: 'log', text: `Processing page ${index + 1}/${blobImages.length}...`, logType: 'info' });
+                
+                if (index > 0) {
+                    pdf.addPage();
+                }
+                
+                try {
+                    // Create canvas to convert image
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext("2d");
+                    
+                    // Set canvas size to match image
+                    canvas.width = img.naturalWidth || img.width;
+                    canvas.height = img.naturalHeight || img.height;
+                    
+                    // Draw image on canvas
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    
+                    // Convert to data URL
+                    const imgData = canvas.toDataURL("image/jpeg", 1.0);
+                    
+                    // Calculate dimensions to fit PDF page
+                    const pageWidth = pdf.internal.pageSize.getWidth();
+                    const pageHeight = pdf.internal.pageSize.getHeight();
+                    const imgRatio = canvas.width / canvas.height;
+                    const pageRatio = pageWidth / pageHeight;
+                    
+                    let width, height, x, y;
+                    
+                    if (imgRatio > pageRatio) {
+                        // Image is wider than page ratio
+                        width = pageWidth;
+                        height = pageWidth / imgRatio;
+                        x = 0;
+                        y = (pageHeight - height) / 2;
+                    } else {
+                        // Image is taller than page ratio
+                        height = pageHeight;
+                        width = pageHeight * imgRatio;
+                        x = (pageWidth - width) / 2;
+                        y = 0;
+                    }
+                    
+                    // Add image to PDF
+                    pdf.addImage(imgData, 'JPEG', x, y, width, height);
+                    
+                } catch (pageError) {
+                    console.error(`Error processing page ${index + 1}:`, pageError);
+                    this.sendMessage({ type: 'log', text: `Warning: Error processing page ${index + 1}`, logType: 'error' });
+                }
+            }
+            
+            // Clean up the filename
+            const cleanFileName = this.cleanupFileName(fileName);
+            
+            // Save the PDF
+            this.sendMessage({ type: 'log', text: `Saving PDF as: ${cleanFileName}`, logType: 'info' });
+            pdf.save(cleanFileName);
+            
+            this.sendMessage({ type: 'log', text: 'PDF generation completed successfully!', logType: 'success' });
+            
+        } catch (error) {
+            console.error('PDF generation failed:', error);
+            throw new Error(`PDF generation failed: ${error.message}`);
         }
     }
     
