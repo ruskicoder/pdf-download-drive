@@ -2253,8 +2253,10 @@ class GoogleDrivePDFDownloader {
                     (function() {
                         console.log('🎯 PDF Generation Script Started');
                         
-                        // Clean filename function
+                        // Clean filename function with Vietnamese character support
                         function cleanupFileName(rawText) {
+                            console.log('🔍 Script cleanupFileName input:', rawText);
+                            
                             if (!rawText || typeof rawText !== 'string') {
                                 return 'download.pdf';
                             }
@@ -2265,67 +2267,77 @@ class GoogleDrivePDFDownloader {
                             }
                             
                             let fullText = rawText.substring(0, pdfIndex + 4);
+                            console.log('📝 Script text up to .pdf:', fullText);
                             
-                            // Remove common UI elements and unwanted prefixes
-                            const uiElements = [
+                            // Conservative UI element removal for Vietnamese filenames
+                            const uiPrefixes = [
+                                'NameMore sorting optionsShow foldersOn topMixed with filesFiles',
                                 'NameMore sorting options',
                                 'Show folders',
                                 'On top',
                                 'Mixed with files',
                                 'Files',
-                                'Name',
-                                'More sorting options',
-                                'Show',
-                                'folders',
-                                'On',
-                                'top',
-                                'Mixed',
-                                'with',
-                                'files',
-                                'View options',
-                                'Sort',
-                                'Filter',
-                                'Settings',
-                                'More',
-                                'Options',
-                                'Menu'
+                                'Name'
                             ];
                             
                             let cleanText = fullText;
-                            for (const uiElement of uiElements) {
-                                cleanText = cleanText.replace(new RegExp('^' + uiElement, 'i'), '');
-                            }
                             
-                            // Extract actual filename patterns - simplified to avoid escaping issues
-                            if (cleanText.includes('.pdf')) {
-                                const parts = cleanText.split(/\\s+/);
-                                for (let i = parts.length - 1; i >= 0; i--) {
-                                    if (parts[i].toLowerCase().includes('.pdf')) {
-                                        const pdfPart = parts[i];
-                                        if (pdfPart.length > 4) {
-                                            cleanText = pdfPart;
-                                            break;
-                                        }
-                                    }
+                            // Remove UI prefixes carefully
+                            for (const prefix of uiPrefixes) {
+                                if (cleanText.toLowerCase().startsWith(prefix.toLowerCase())) {
+                                    cleanText = cleanText.substring(prefix.length);
+                                    console.log('🧹 Script removed UI prefix:', prefix);
+                                    break;
                                 }
                             }
                             
-                            // Fallback: extract from end backwards
-                            if (!cleanText.toLowerCase().endsWith('.pdf') || cleanText.length < 5) {
+                            // Clean leading non-filename characters while preserving Vietnamese
+                            cleanText = cleanText.replace(/^[^A-ZÀ-ÿ0-9\\u00C0-\\u024F\\u1E00-\\u1EFF]*/i, '');
+                            
+                            // Extract filename with Vietnamese character support
+                            const filenamePatterns = [
+                                /([A-ZÀ-ÿ\\u00C0-\\u024F\\u1E00-\\u1EFF0-9\\s\\-_\\(\\)\\[\\]\\.]+\\.pdf)$/i,
+                                /([^\\\\/:\"*?<>|]+\\.pdf)$/i,
+                                /([A-ZÀ-ÿ\\u00C0-\\u024F\\u1E00-\\u1EFF0-9]+\\.pdf)$/i
+                            ];
+                            
+                            let foundMatch = false;
+                            for (const pattern of filenamePatterns) {
+                                const match = cleanText.match(pattern);
+                                if (match && match[1].length > 4) {
+                                    cleanText = match[1];
+                                    console.log('✅ Script found pattern:', cleanText);
+                                    foundMatch = true;
+                                    break;
+                                }
+                            }
+                            
+                            // Fallback word extraction for Vietnamese
+                            if (!foundMatch || !cleanText.toLowerCase().endsWith('.pdf') || cleanText.length < 5) {
+                                console.log('🔄 Script trying word extraction...');
                                 const beforePdf = fullText.substring(0, pdfIndex);
                                 const words = beforePdf.split(/\\s+/);
                                 
+                                let filenameWords = [];
                                 for (let i = words.length - 1; i >= 0; i--) {
                                     const word = words[i].trim();
-                                    if (word.length > 0 && /[A-ZÀ-ÿ0-9]/.test(word)) {
-                                        cleanText = word + '.pdf';
+                                    if (word.length > 0 && /[A-ZÀ-ÿ\\u00C0-\\u024F\\u1E00-\\u1EFF0-9]/.test(word)) {
+                                        filenameWords.unshift(word);
+                                        if (filenameWords.join(' ').length > 50) break;
+                                    } else if (filenameWords.length > 0) {
                                         break;
                                     }
                                 }
+                                
+                                if (filenameWords.length > 0) {
+                                    cleanText = filenameWords.join(' ') + '.pdf';
+                                    console.log('🔤 Script reconstructed:', cleanText);
+                                }
                             }
                             
+                            // Final cleanup preserving Vietnamese characters
                             cleanText = cleanText.trim();
-                            cleanText = cleanText.replace(/[<>:"/\\\\\\\\|?*]/g, '_');
+                            cleanText = cleanText.replace(/[<>:\"/\\\\|?*]/g, '_');
                             cleanText = cleanText.replace(/\\s+/g, ' ');
                             
                             if (!cleanText.toLowerCase().endsWith('.pdf')) {
@@ -2333,9 +2345,11 @@ class GoogleDrivePDFDownloader {
                             }
                             
                             if (cleanText.length <= 4 || cleanText.toLowerCase() === '.pdf') {
+                                console.log('❌ Script filename too short:', cleanText);
                                 return 'document.pdf';
                             }
                             
+                            console.log('✅ Script final filename:', cleanText);
                             return cleanText;
                         }
                         
@@ -2484,6 +2498,8 @@ class GoogleDrivePDFDownloader {
             return 'download.pdf';
         }
         
+        console.log(`🔍 Original filename text: "${rawText}"`);
+        
         // Find .pdf in the text
         const pdfIndex = rawText.toLowerCase().indexOf('.pdf');
         if (pdfIndex === -1) {
@@ -2492,82 +2508,95 @@ class GoogleDrivePDFDownloader {
         
         // Extract text up to and including .pdf
         let fullText = rawText.substring(0, pdfIndex + 4);
+        console.log(`📝 Text up to .pdf: "${fullText}"`);
         
-        // Remove common UI elements and unwanted prefixes that appear before actual filenames
-        const uiElements = [
+        // More conservative UI element removal - only remove exact matches at the beginning
+        const uiPrefixes = [
+            'NameMore sorting optionsShow foldersOn topMixed with filesFiles',
             'NameMore sorting options',
             'Show folders',
             'On top',
             'Mixed with files',
             'Files',
-            'Name',
-            'More sorting options',
-            'Show',
-            'folders',
-            'On',
-            'top',
-            'Mixed',
-            'with',
-            'files',
-            'View options',
-            'Sort',
-            'Filter',
-            'Settings',
-            'More',
-            'Options',
-            'Menu'
+            'Name'
         ];
         
-        // Remove UI elements from the beginning of the text
         let cleanText = fullText;
-        for (const uiElement of uiElements) {
-            // Case-insensitive removal of UI elements
-            const regex = new RegExp('^' + uiElement.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-            cleanText = cleanText.replace(regex, '');
+        
+        // Remove UI prefixes more carefully - only if they appear at the very beginning
+        for (const prefix of uiPrefixes) {
+            if (cleanText.toLowerCase().startsWith(prefix.toLowerCase())) {
+                cleanText = cleanText.substring(prefix.length);
+                console.log(`🧹 Removed UI prefix "${prefix}": "${cleanText}"`);
+                break; // Only remove the first match to avoid over-processing
+            }
         }
         
-        // Extract the actual filename by looking for patterns
-        // Strategy 1: Look for filename patterns (word characters, spaces, dots, followed by .pdf)
+        // Clean up any remaining leading non-filename characters
+        cleanText = cleanText.replace(/^[^A-ZÀ-ÿ0-9\u00C0-\u024F\u1E00-\u1EFF]*/i, '');
+        
+        // Extract filename using improved patterns that handle Vietnamese characters
         const filenamePatterns = [
-            // Match filename with extensions before .pdf (e.g., "MÁY NÉN.pdf")
-            /([A-ZÀ-ÿ0-9\s\-_\(\)\[\]\.]+\.pdf)$/i,
-            // Match any reasonable filename ending with .pdf
+            // Pattern 1: Full Vietnamese filename (including diacritics and spaces)
+            /([A-ZÀ-ÿ\u00C0-\u024F\u1E00-\u1EFF0-9\s\-_\(\)\[\]\.]+\.pdf)$/i,
+            // Pattern 2: Any reasonable filename ending with .pdf
             /([^\\/:"*?<>|]+\.pdf)$/i,
-            // Match the last word + .pdf pattern
-            /(\w+\.pdf)$/i
+            // Pattern 3: Conservative fallback - last word + .pdf
+            /([A-ZÀ-ÿ\u00C0-\u024F\u1E00-\u1EFF0-9]+\.pdf)$/i
         ];
         
+        let foundMatch = false;
         for (const pattern of filenamePatterns) {
             const match = cleanText.match(pattern);
-            if (match) {
+            if (match && match[1].length > 4) {
                 cleanText = match[1];
+                console.log(`✅ Found filename pattern: "${cleanText}"`);
+                foundMatch = true;
                 break;
             }
         }
         
-        // Strategy 2: If no pattern matched, extract from the end backwards
-        if (!cleanText.toLowerCase().endsWith('.pdf') || cleanText.length < 5) {
-            // Find the last occurrence of a word character before .pdf
+        // If no pattern matched, try to extract more conservatively
+        if (!foundMatch || !cleanText.toLowerCase().endsWith('.pdf') || cleanText.length < 5) {
+            console.log(`🔄 Pattern matching failed, trying word extraction...`);
+            
+            // Find the text before .pdf and split by whitespace
             const beforePdf = fullText.substring(0, pdfIndex);
             const words = beforePdf.split(/\s+/);
             
-            // Take the last meaningful word as the filename
+            // Look for Vietnamese filename patterns - collect consecutive meaningful words
+            let filenameWords = [];
             for (let i = words.length - 1; i >= 0; i--) {
                 const word = words[i].trim();
-                if (word.length > 0 && /[A-ZÀ-ÿ0-9]/.test(word)) {
-                    cleanText = word + '.pdf';
+                // Check if word contains Vietnamese characters or is meaningful
+                if (word.length > 0 && /[A-ZÀ-ÿ\u00C0-\u024F\u1E00-\u1EFF0-9]/.test(word)) {
+                    filenameWords.unshift(word);
+                    // Stop if we hit a UI element or the filename is getting too long
+                    if (filenameWords.join(' ').length > 50 || 
+                        word.toLowerCase().includes('file') || 
+                        word.toLowerCase().includes('name') ||
+                        word.toLowerCase().includes('option')) {
+                        break;
+                    }
+                } else if (filenameWords.length > 0) {
+                    // Stop collecting if we hit a gap after finding some words
                     break;
                 }
             }
+            
+            if (filenameWords.length > 0) {
+                cleanText = filenameWords.join(' ') + '.pdf';
+                console.log(`🔤 Reconstructed filename from words: "${cleanText}"`);
+            }
         }
         
-        // Final cleanup
+        // Final cleanup while preserving Vietnamese characters
         cleanText = cleanText.trim();
         
-        // Remove invalid filename characters but preserve international characters
+        // Remove invalid filename characters but preserve all international characters
         cleanText = cleanText.replace(/[<>:"/\\|?*]/g, '_');
         
-        // Remove excessive whitespace
+        // Normalize whitespace
         cleanText = cleanText.replace(/\s+/g, ' ');
         
         // Ensure it ends with .pdf
@@ -2575,11 +2604,13 @@ class GoogleDrivePDFDownloader {
             cleanText += '.pdf';
         }
         
-        // Fallback if result is too short or only contains .pdf
+        // Final validation
         if (cleanText.length <= 4 || cleanText.toLowerCase() === '.pdf') {
+            console.log(`❌ Filename too short or invalid: "${cleanText}"`);
             return 'document.pdf';
         }
         
+        console.log(`✅ Final cleaned filename: "${cleanText}"`);
         return cleanText;
     }
     
