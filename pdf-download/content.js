@@ -77,13 +77,28 @@ class GoogleDrivePDFDownloader {
             user-select: none;
         `;
         
+        // Get version from manifest
+        const getVersionFromManifest = () => {
+            try {
+                if (chrome && chrome.runtime && chrome.runtime.getManifest) {
+                    const manifest = chrome.runtime.getManifest();
+                    return manifest.version;
+                }
+            } catch (error) {
+                console.log('Could not get version from manifest:', error);
+            }
+            return '1.0.0'; // fallback version
+        };
+
+        const version = getVersionFromManifest();
+
         // Create the persistent popup panel
         const popupPanel = document.createElement('div');
         popupPanel.id = 'pdf-downloader-panel';
         
         popupPanel.innerHTML = `
             <div class="panel-header">
-                <h3>PDF Downloader</h3>
+                <h3>PDF Downloader <span style="font-size: 0.8em; color: #666;">v${version}</span></h3>
                 <div class="panel-controls">
                     <button id="minimize-btn" title="Minimize">−</button>
                     <button id="close-btn" title="Hide">×</button>
@@ -115,9 +130,9 @@ class GoogleDrivePDFDownloader {
         
         popupPanel.style.cssText = `
             position: fixed;
-            top: 70px;
-            left: 50%;
-            transform: translateX(-50%);
+            top: 7vh;
+            right: 4vw;
+            transform: none;
             width: 320px;
             max-height: 500px;
             background: white;
