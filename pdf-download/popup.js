@@ -42,9 +42,9 @@ class PopupController {
                 this.downloadSingleBtn.disabled = false;
                 this.downloadAllBtn.disabled = true;
             } else if (response && response.type === 'folder') {
-                this.setStatus('Bulk download temporarily disabled. Open a file preview for single download.');
+                this.setStatus('Folder detected - bulk download available');
                 this.downloadSingleBtn.disabled = true;
-                this.downloadAllBtn.disabled = true;
+                this.downloadAllBtn.disabled = false;
             } else if (response && response.type === 'folder_disabled') {
                 this.setStatus('Bulk download temporarily disabled. Open a file preview for single download.');
                 this.downloadSingleBtn.disabled = true;

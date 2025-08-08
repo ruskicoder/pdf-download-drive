@@ -39,24 +39,28 @@ When you visit Google Drive (drive.google.com), the extension automatically inje
 
 1. **Open a Google Drive folder** containing PDF files
 2. **Click the floating button** or extension icon  
-3. **Click "Download All Files"**
+3. **Click "Download All Files in Folder"**
 4. The extension will:
-   - Scan all files in the current folder
-   - Open each file in a background tab
-   - Generate high-quality PDFs
-   - Download them with proper names
-   - Close background tabs automatically
+   - Use OCR to scan the entire folder for PDF files
+   - Automatically detect all filenames ending with .pdf
+   - Click on each file to open its preview
+   - Download each file using the same process as single file download
+   - Close preview and move to next file
+   - Continue until all PDF files are downloaded
+   - Show progress and status for each file
 
 ## How It Works
 
 ### PDF Generation Process
 
-1. **File Detection**: Scans Google Drive folder for PDF files
-2. **Background Loading**: Opens each file in a hidden browser tab
-3. **Image Extraction**: Finds all blob images (PDF pages) in the preview
-4. **High-Quality Conversion**: Uses HTML5 Canvas to maintain full resolution
-5. **PDF Assembly**: Creates multi-page PDFs using jsPDF library
-6. **Smart Download**: Names files based on Google Drive titles
+1. **File Detection**: Uses OCR to scan the entire Google Drive folder interface for PDF files
+2. **Smart Filename Recognition**: Detects filenames ending with .pdf from visible text elements
+3. **Automated Clicking**: Simulates clicks on file elements using jQuery and native JavaScript events
+4. **Preview Loading**: Opens each file in Google Drive's preview mode
+5. **Image Extraction**: Finds all blob images (PDF pages) in the preview
+6. **High-Quality Conversion**: Uses HTML5 Canvas to maintain full resolution
+7. **PDF Assembly**: Creates multi-page PDFs using jsPDF library
+8. **Smart Download**: Names files based on detected filenames from OCR scan
 
 ### Local Security
 
@@ -157,6 +161,7 @@ pdf-download/
 ├── popup.js              # Popup functionality
 ├── popup.css             # Popup styling
 ├── jspdf.umd.min.js      # Local PDF generation library
+├── jquery.min.js         # jQuery library for DOM manipulation and click simulation
 └── img/                  # Extension icons
     ├── icon48.png
     └── icon128.png
@@ -165,11 +170,13 @@ pdf-download/
 ### Key Features Implemented
 
 ✅ **CSP Compliance**: Local jsPDF loading avoids external script blocks  
-✅ **Background Processing**: Hidden tabs don't interrupt user workflow  
+✅ **OCR File Detection**: Intelligent scanning of Google Drive interface for PDF files  
+✅ **Automated Clicking**: jQuery-powered file interaction and preview opening  
 ✅ **Error Handling**: Robust error handling with user feedback  
 ✅ **High Quality**: Full resolution PDF output  
-✅ **Smart Naming**: Automatic filename extraction  
-✅ **Progress Tracking**: Real-time download status  
+✅ **Smart Naming**: Automatic filename extraction from OCR scans  
+✅ **Progress Tracking**: Real-time download status and file counters  
+✅ **Bulk Processing**: Sequential download of all PDF files in a folder  
 
 ## Version History
 
