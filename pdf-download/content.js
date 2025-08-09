@@ -1892,8 +1892,8 @@ class GoogleDrivePDFDownloader {
             // Scroll to load all pages (pages need to be preserved, not cleared)
             await this.scrollToLoadAllPages();
             
-            // Wait for DOM to settle and all pages to load
-            await this.sleep(3000);
+            // Extra verification for complete loading - especially important for last file
+            await this.verifyCompletePageLoading(expectedFilename);
             
             // CRITICAL: Tag all current blob images with this file's identifier
             const fileId = `file_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -2697,29 +2697,156 @@ class GoogleDrivePDFDownloader {
             this.scrollExtensionRunning = false;
         }
     }
+    
+    async verifyCompletePageLoading(filename) {
+        this.sendMessage({ type: 'log', text: `🔍 Verifying complete page loading for ${filename}...`, logType: 'info' });
+        
+        let previousPageCount = 0;
+        let stableCount = 0;
+        const maxVerificationTime = 15000; // 15 seconds max verification
+        const stabilityCheckInterval = 1000; // Check every second
+        const requiredStableChecks = 3; // Need 3 consecutive stable checks
+        
+        // Establish baseline page count for current file verification
+        const baselinePageCount = document.querySelectorAll('img[src^="blob:"]').length;
+        let baselineEstablished = false;
+        
+        const startTime = Date.now();
+        
+        while (Date.now() - startTime < maxVerificationTime) {
+            const totalPageCount = document.querySelectorAll('img[src^="blob:"]').length;
+            
+            // Establish baseline on first iteration if not already set
+            if (!baselineEstablished) {
+                baselineEstablished = true;
+            }
+            
+            // Calculate current file page count relative to start of verification
+            const currentFilePageCount = totalPageCount - baselinePageCount;
+            
+            if (currentFilePageCount === previousPageCount && currentFilePageCount > 0) {
+                stableCount++;
+                this.sendMessage({ 
+                    type: 'log', 
+                    text: `📊 Page count stable: ${currentFilePageCount} pages (${stableCount}/${requiredStableChecks} checks)`, 
+                    logType: 'info' 
+                });
+                
+                if (stableCount >= requiredStableChecks) {
+                    this.sendMessage({ 
+                        type: 'log', 
+                        text: `✅ Complete page loading verified: ${currentFilePageCount} pages loaded`, 
+                        logType: 'success' 
+                    });
+                    return;
+                }
+            } else {
+                if (currentFilePageCount !== previousPageCount) {
+                    this.sendMessage({ 
+                        type: 'log', 
+                        text: `📈 Page count changed: ${previousPageCount} → ${currentFilePageCount}`, 
+                        logType: 'info' 
+                    });
+                }
+                stableCount = 0; // Reset stability counter
+                previousPageCount = currentFilePageCount;
+            }
+            
+            await this.sleep(stabilityCheckInterval);
+        }
+        
+        // If we reach here, verification time exceeded
+        const totalPageCount = document.querySelectorAll('img[src^="blob:"]').length;
+        const finalFilePageCount = totalPageCount - baselinePageCount;
+        this.sendMessage({ 
+            type: 'log', 
+            text: `⚠️ Page loading verification timeout - proceeding with ${finalFilePageCount} pages`, 
+            logType: 'warning' 
+        });
+    }
 
     async startAutoScroll() {
         return new Promise((resolve) => {
+            let startTime = Date.now();
+            let lastPageCount = 0;
+            let stablePageCountDuration = 0;
+            const minScrollDuration = 5000; // Minimum 5 seconds of scrolling
+            const stabilizationTime = 3000; // 3 seconds of stable page count
+            
+            // Reset page count baseline for current file
+            const baselinePageCount = document.querySelectorAll('img[src^="blob:"]').length;
+            
             // Start auto-scroll detection
             this.selectScrollableElements();
             
             // Monitor progress and stop when complete
             const checkComplete = setInterval(() => {
+                const currentTime = Date.now();
+                const scrollDuration = currentTime - startTime;
                 const hasActiveScrolling = this.hasActiveScrollElements();
                 
-                if (!hasActiveScrolling || !this.scrollExtensionRunning) {
+                // Count current blob images (pages) relative to baseline
+                const totalPageCount = document.querySelectorAll('img[src^="blob:"]').length;
+                const currentFilePageCount = totalPageCount - baselinePageCount;
+                
+                // Check if page count is stable
+                if (currentFilePageCount === lastPageCount) {
+                    stablePageCountDuration += 1000; // Add 1 second to stable duration
+                } else {
+                    stablePageCountDuration = 0; // Reset stable duration
+                    lastPageCount = currentFilePageCount;
+                }
+                
+                this.sendMessage({ 
+                    type: 'log', 
+                    text: `📊 Scroll progress: ${currentFilePageCount} pages, stable for ${stablePageCountDuration}ms, duration: ${scrollDuration}ms`, 
+                    logType: 'info' 
+                });
+                
+                // More robust completion criteria
+                const hasMinimumDuration = scrollDuration >= minScrollDuration;
+                const hasStablizedContent = stablePageCountDuration >= stabilizationTime;
+                const noActiveScrolling = !hasActiveScrolling;
+                const hasContent = currentFilePageCount > 0;
+                
+                // Complete when we have content, minimum duration, stable page count, and no active scrolling
+                if (hasContent && hasMinimumDuration && hasStablizedContent && (noActiveScrolling || !this.scrollExtensionRunning)) {
+                    this.sendMessage({ 
+                        type: 'log', 
+                        text: `✅ Scroll completed: ${currentFilePageCount} pages loaded, ${scrollDuration}ms duration`, 
+                        logType: 'success' 
+                    });
+                    clearInterval(checkComplete);
+                    this.scrollExtensionRunning = false;
+                    resolve();
+                }
+                
+                // Safety check - if no content after extended time, still complete
+                if (scrollDuration >= 45000 && currentFilePageCount === 0) {
+                    this.sendMessage({ 
+                        type: 'log', 
+                        text: `⚠️ Scroll timeout with no content - completing anyway`, 
+                        logType: 'warning' 
+                    });
                     clearInterval(checkComplete);
                     this.scrollExtensionRunning = false;
                     resolve();
                 }
             }, 1000);
             
-            // Safety timeout
+            // Safety timeout - increased to handle slower loading
             setTimeout(() => {
+                const totalPageCount = document.querySelectorAll('img[src^="blob:"]').length;
+                const finalPageCount = totalPageCount - baselinePageCount;
+                this.sendMessage({ 
+                    type: 'log', 
+                    text: `⏰ Scroll safety timeout reached - ${finalPageCount} pages loaded`, 
+                    logType: 'warning' 
+                });
                 clearInterval(checkComplete);
                 this.scrollExtensionRunning = false;
                 resolve();
-            }, 60000); // 60 second max scroll time
+            }, 75000); // Increased to 75 seconds for large files
         });
     }
 
